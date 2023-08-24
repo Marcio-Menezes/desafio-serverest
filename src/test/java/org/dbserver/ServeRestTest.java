@@ -4,28 +4,28 @@ import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import org.dbserver.model.Usuario;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assertions.*;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class ServeRestTest {
 
     private static final String BASE_URL = "https://serverest.dev";
 
-    private ServeRestStub serveRestStub = new ServeRestStub();
+    private ServeRestStub serveRestStub;
 
-    private String idUsuario;
-
-    @BeforeEach
+    @BeforeAll
     void setup() {
         RestAssured.baseURI = BASE_URL;
+        serveRestStub = new ServeRestStub();
     }
 
     @Test
     @DisplayName("Teste verificando se o get usuarios lista os corretamente")
+    @Order(3)
     void testListarUsuarios() {
         Response response = given()
                 .when()
@@ -48,7 +48,8 @@ public class ServeRestTest {
 
     @Test
     @DisplayName("Teste que verifica se um novo usuario pode ser criado")
-    void testCriaUsuario(){
+    @Order(1)
+    void testCriaUsuario() {
         Usuario usuario = serveRestStub.postUsuario();
         Response response = given()
                 .contentType(ContentType.JSON)
@@ -56,13 +57,14 @@ public class ServeRestTest {
                 .when()
                 .post("/usuarios");
         assertEquals(201, response.getStatusCode());
-        this.idUsuario = response.jsonPath().getString("_id");
-        System.out.println(this.idUsuario);
+        serveRestStub.setIdUsuario(response.jsonPath().getString("_id"));
+        System.out.println(serveRestStub.getIdUsuario());
     }
 
     @Test
     @DisplayName("Teste que verifica se um usuario com email já existente pode ser criado")
-    void testCriaUsuarioInvalido(){
+    @Order(2)
+    void testCriaUsuarioInvalido() {
         Usuario usuario = serveRestStub.postUsuario();
         Response response = given()
                 .contentType(ContentType.JSON)
@@ -74,11 +76,14 @@ public class ServeRestTest {
 
     @Test
     @DisplayName("Teste que verifica se um usuario pode ser buscado")
-    void testBuscarUsuario(){
+    @Order(4)
+    void testBuscarUsuario() {
+        System.out.println(serveRestStub.getIdUsuario());
         Usuario usuario = serveRestStub.postUsuario();
+        String idUsuario = serveRestStub.getIdUsuario();
         Response response = given()
                 .when()
-                .get("/usuarios/NHLvGXO9I2dLl8WT");
+                .get("/usuarios/" + idUsuario);
         assertEquals(200, response.getStatusCode());
 
         String nome = response.jsonPath().getString("nome");
@@ -91,42 +96,42 @@ public class ServeRestTest {
         assertEquals(usuario.getEmail(), email);
         assertEquals(usuario.getPassword(), senha);
         assertEquals(usuario.getAdministrador(), admin);
-        assertEquals("NHLvGXO9I2dLl8WT", id);
+        assertEquals(idUsuario, id);
 
     }
 
     @Test
     @DisplayName("Teste que verifica se um usuario pode ter sua senha editada")
-    void testEditarUsuario(){
+    @Order(5)
+    void testEditarUsuario() {
         Usuario usuario = serveRestStub.postUsuario();
+        String idUsuario = serveRestStub.getIdUsuario();
         Response response = given()
-                .when()
+                .contentType(ContentType.JSON)
                 .body(usuario)
-                .put("/usuarios/NHLvGXO9I2dLl8WT");
+                .when()
+                .put("/usuarios/" + idUsuario);
         assertEquals(200, response.getStatusCode());
 
-        String nome = response.jsonPath().getString("nome");
-        String email = response.jsonPath().getString("email");
-        String senha = response.jsonPath().getString("password");
-        String admin = response.jsonPath().getString("administrador");
-
-        assertEquals(usuario.getNome(), nome);
-        assertEquals(usuario.getEmail(), email);
-        assertEquals(usuario.getPassword(), senha);
-        assertEquals(usuario.getAdministrador(), admin);
+        String mensagem = response.jsonPath().getString("message");
+        assertEquals("Registro alterado com sucesso", mensagem);
 
     }
 
     @Test
     @DisplayName("Teste que verifica se um usuario pode ser deletado")
-    void testDeletarUsuario(){
+    @Order(6)
+    void testDeletarUsuario() {
+        String idUsuario = serveRestStub.getIdUsuario();
         Response response = given()
                 .when()
-                .delete("/usuarios/NHLvGXO9I2dLl8WT");
+                .delete("/usuarios/" + idUsuario);
         assertEquals(200, response.getStatusCode());
 
-    }
+        String mensagem = response.jsonPath().getString("message");
+        assertEquals("Registro excluído com sucesso", mensagem);
 
+    }
 
 
 }
