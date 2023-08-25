@@ -7,7 +7,8 @@ import org.dbserver.model.Usuario;
 import org.junit.jupiter.api.*;
 
 import static io.restassured.RestAssured.given;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.SoftAssertions.assertSoftly;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -32,18 +33,17 @@ public class ServeRestTest {
                 .get("/usuarios");
 
         assertEquals(200, response.getStatusCode());
-
-        String primeiroNome = response.jsonPath().getString("usuarios[0].nome");
-        String primeiroEmail = response.jsonPath().getString("usuarios[0].email");
-        String primeiroPassword = response.jsonPath().getString("usuarios[0].password");
-        boolean primeiroAdministrador = response.jsonPath().getBoolean("usuarios[0].administrador");
-
-        assertFalse(primeiroNome.isEmpty());
-        assertFalse(primeiroEmail.isEmpty());
-        assertFalse(primeiroPassword.isEmpty());
-        assertTrue(primeiroAdministrador);
-
-        assertTrue(primeiroEmail.matches("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,4}"));
+        assertSoftly(softly -> {
+            String primeiroNome = response.jsonPath().getString("usuarios[0].nome");
+            String primeiroEmail = response.jsonPath().getString("usuarios[0].email");
+            String primeiroPassword = response.jsonPath().getString("usuarios[0].password");
+            boolean primeiroAdministrador = response.jsonPath().getBoolean("usuarios[0].administrador");
+            softly.assertThat(primeiroNome).isNotEmpty();
+            softly.assertThat(primeiroEmail).isNotEmpty();
+            softly.assertThat(primeiroPassword).isNotEmpty();
+            softly.assertThat(primeiroAdministrador).isTrue();
+            softly.assertThat(primeiroEmail).matches("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,4}");
+        });
     }
 
     @Test
@@ -58,7 +58,7 @@ public class ServeRestTest {
                 .post("/usuarios");
         assertEquals(201, response.getStatusCode());
         serveRestStub.setIdUsuario(response.jsonPath().getString("_id"));
-        System.out.println(serveRestStub.getIdUsuario());
+        ;
     }
 
     @Test
@@ -78,26 +78,25 @@ public class ServeRestTest {
     @DisplayName("Teste que verifica se um usuario pode ser buscado")
     @Order(4)
     void testBuscarUsuario() {
-        System.out.println(serveRestStub.getIdUsuario());
         Usuario usuario = serveRestStub.postUsuario();
         String idUsuario = serveRestStub.getIdUsuario();
         Response response = given()
                 .when()
                 .get("/usuarios/" + idUsuario);
         assertEquals(200, response.getStatusCode());
+        assertSoftly(softly -> {
+            String nome = response.jsonPath().getString("nome");
+            String email = response.jsonPath().getString("email");
+            String senha = response.jsonPath().getString("password");
+            String admin = response.jsonPath().getString("administrador");
+            String id = response.jsonPath().getString("_id");
 
-        String nome = response.jsonPath().getString("nome");
-        String email = response.jsonPath().getString("email");
-        String senha = response.jsonPath().getString("password");
-        String admin = response.jsonPath().getString("administrador");
-        String id = response.jsonPath().getString("_id");
-
-        assertEquals(usuario.getNome(), nome);
-        assertEquals(usuario.getEmail(), email);
-        assertEquals(usuario.getPassword(), senha);
-        assertEquals(usuario.getAdministrador(), admin);
-        assertEquals(idUsuario, id);
-
+            softly.assertThat(nome).isEqualTo(usuario.getNome());
+            softly.assertThat(email).isEqualTo(usuario.getEmail());
+            softly.assertThat(senha).isEqualTo(usuario.getPassword());
+            softly.assertThat(admin).isEqualTo(usuario.getAdministrador());
+            softly.assertThat(id).isEqualTo(idUsuario);
+        });
     }
 
     @Test
@@ -133,6 +132,20 @@ public class ServeRestTest {
 
     }
 
+    @Test
+    @DisplayName("Teste que verifica se um usuario invalido pode ser deletado")
+    @Order(7)
+    void testDeletarUsuarioIncorreto() {
+        String idUsuario = serveRestStub.getIdUsuario();
+        Response response = given()
+                .when()
+                .delete("/usuarios/" + idUsuario);
+        assertEquals(200, response.getStatusCode());
+
+        String mensagem = response.jsonPath().getString("message");
+        assertEquals("Nenhum registro excluído", mensagem);
+
+    }
 
 }
 
